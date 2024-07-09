@@ -3,11 +3,8 @@
 #Packages##########################################################################################################
 import pandas as pd
 import numpy as np
-#from PIL import Image
 from tqdm import tqdm
-#from transformers import AutoProcessor, AutoModelForZeroShotImageClassification
 import h5py, os, io
-#from utils import HDFDataset,get_transform
 from torch.utils.data import Dataset, DataLoader
 import torch, clip
 import torch.nn as nn
@@ -42,7 +39,6 @@ train_val_fraction = 0.7
 
 data = pd.read_csv("Data/train_metadata_with_descriptions.csv", low_memory=False, header=0, index_col=0)
 data = data.reset_index(drop=True)
-
 
 #Load feature vectors 
 features=np.load("Data/train_vision_text_embeddings.npy")
