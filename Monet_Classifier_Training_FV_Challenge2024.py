@@ -4,21 +4,16 @@
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
-import h5py, os, io
 from torch.utils.data import Dataset, DataLoader
-import torch, clip
+import torch
 import torch.nn as nn
-from torchvision.utils import make_grid, save_image
 from tqdm import tqdm
-from skimage.transform import rescale, resize, downscale_local_mean
 import random
 import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from sklearn.metrics import roc_auc_score, confusion_matrix
+from sklearn.metrics import roc_auc_score, confusion_matrix, roc_curve, auc
 ####################################################################################################################
 
-
-#Preliminary Things#################################################################################################
     
 #Connect to device 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -27,7 +22,6 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 batch_size = 128
 
 #Define Train vs Validation ratio (default 0.7 Train and 0.3 Val)
-
 train_val_fraction = 0.7
 
 
@@ -39,6 +33,7 @@ train_val_fraction = 0.7
 
 data = pd.read_csv("Data/train_metadata_with_descriptions.csv", low_memory=False, header=0, index_col=0)
 data = data.reset_index(drop=True)
+
 
 #Load feature vectors 
 features=np.load("Data/train_vision_text_embeddings.npy")
@@ -134,6 +129,9 @@ scheduler = ReduceLROnPlateau(optimizer, mode="max", factor=0.5, patience=10, ve
 best_val_roc_auc=0 
 best_epoch = 0
 
+min_tpr = 0.88
+max_fpr = 1 - min_tpr
+
 for epoch in range(num_epochs):
     classification_head.train()  
     running_loss = 0.0 
@@ -141,7 +139,7 @@ for epoch in range(num_epochs):
     train_preds=[]
 
     for feature, target in tqdm(train_loader): 
-        feature, target = feature.view(feature.size(0),-1).to(device).to(torch.float), target.to(device)  # Convert inputs to float type
+        feature, target = feature.view(feature.size(0),-1).to(device).to(torch.float), target.to(device)  
         optimizer.zero_grad() 
         outputs = classification_head(feature)
         loss = criterion(outputs, target.float().view(-1,1)) 
@@ -152,15 +150,34 @@ for epoch in range(num_epochs):
         train_preds += [l for l in nn.Sigmoid()(outputs).cpu().detach().numpy()]
     train_auc = roc_auc_score(train_labels, train_preds)
 
+    #Calculate the pAUC using https://github.com/ISIC-Research/Challenge-2024-Metrics/blob/main/PrimaryMetric-pAUC.py
+    gt = abs(np.asarray(train_labels) - 1)
+    pred = -1.0 * np.asarray(train_preds)
+
+    fpr, tpr, _ = roc_curve(gt, pred, sample_weight=None)
+    if max_fpr is None or max_fpr == 1:
+        partial_auc = auc(fpr, tpr)
+    elif max_fpr <= 0 or max_fpr > 1:
+        raise ValueError("Expected min_tpr in range [0, 1), got: %r" % min_tpr)
+    else:
+        # Add a single point at max_fpr by linear interpolation
+        stop = np.searchsorted(fpr, max_fpr, "right")
+        x_interp = [fpr[stop - 1], fpr[stop]]
+        y_interp = [tpr[stop - 1], tpr[stop]]
+        tpr = np.append(tpr[:stop], np.interp(max_fpr, x_interp, y_interp))
+        fpr = np.append(fpr[:stop], max_fpr)
+        partial_auc = auc(fpr, tpr)
+
 
     print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {running_loss / len(train_loader)}")
-
     print(f"Training ROC AUC: {train_auc}")
+    print(f"Training pAUC at TPR 0.88: {partial_auc}")
 
-    with open("Monet_TrainAUC_of_FV_.txt", "a") as file:
-        file.write(f"Epoch {epoch + 1}, {train_auc:.4f}\n")
+    with open("Monet_TrainAUC.txt", "a") as file:
+        file.write(f"Epoch {epoch + 1}, AUC: {train_auc:.4f}, pAUC@TPR0.88: {partial_auc:.4f}\n")
 
 
+    #Validation loop
     classification_head.eval()
     val_loss = 0.0
     predictions = []
@@ -181,31 +198,48 @@ for epoch in range(num_epochs):
     # Evaluate the model
     predictions = np.array(predictions)
     true_labels = np.array(true_labels)
-
     threshold = 0.5
     binary_predictions = (predictions > threshold).astype(int)
 
+    #Print the confusion matrix
+    epoch_conf_matrix = confusion_matrix(true_labels, binary_predictions)
+    print(f'\nEpoch: {epoch + 1}, Confusion Matrix:\n{epoch_conf_matrix}')
+
+    #Calculate the ROC
     roc_auc = roc_auc_score(true_labels, predictions)
+    
+    #Calculate the pAUC
+    v_gt = abs(true_labels - 1)
+    v_pred = -1.0 * predictions
+
+    fpr, tpr, _ = roc_curve(v_gt, v_pred, sample_weight=None)
+    if max_fpr is None or max_fpr == 1:
+        partial_auc = auc(fpr, tpr)
+    elif max_fpr <= 0 or max_fpr > 1:
+        raise ValueError("Expected min_tpr in range [0, 1), got: %r" % min_tpr)
+    else:
+        # Add a single point at max_fpr by linear interpolation
+        stop = np.searchsorted(fpr, max_fpr, "right")
+        x_interp = [fpr[stop - 1], fpr[stop]]
+        y_interp = [tpr[stop - 1], tpr[stop]]
+        tpr = np.append(tpr[:stop], np.interp(max_fpr, x_interp, y_interp))
+        fpr = np.append(fpr[:stop], max_fpr)
+        partial_auc = auc(fpr, tpr)
 
     scheduler.step(roc_auc)
 
     print("Validation ROC AUC:", roc_auc)
+    print("Validation pAUC at TPR 0.88:", partial_auc)
 
-    print(predictions)
-
-    epoch_conf_matrix = confusion_matrix(true_labels, binary_predictions)
-    
-    print(f'\nEpoch: {epoch + 1}, Confusion Matrix:\n{epoch_conf_matrix}')
-
-    with open(f"Monet_ValAUC_of_FV.txt", "a") as file:
-        file.write(f"Epoch {epoch + 1}, {roc_auc:.4f}\n")
+    with open(f"Monet_ValAUC.txt", "a") as file:
+        file.write(f"Epoch {epoch + 1}, {roc_auc:.4f}, pAUC@TPR0.88: {partial_auc:.4f}\n")
 
 
     if best_val_roc_auc<roc_auc:
         best_val_roc_auc = roc_auc
         best_epoch=epoch
-        torch.save(classification_head.state_dict(), "Monet_BestModel_FV.pth")
+        torch.save(classification_head.state_dict(), "Monet_BestModel.pth")
 
-    print('*'*40)
+    print('*'*55)
     print(f"Best Validation ROC AUC: {best_val_roc_auc} at Epoch:{best_epoch}")
-    print('*'*40)
+    print('*'*55)
