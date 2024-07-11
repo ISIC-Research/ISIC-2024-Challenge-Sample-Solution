@@ -10,7 +10,7 @@ download_path = 'Data/'
 os.makedirs(download_path, exist_ok=True)
 
 # Download the ISIC 2024 dataset
-os.system(f'kaggle competitions download -c isic-2024-challenge -p download_path')
+os.system(f'kaggle competitions download -c isic-2024-challenge -p {download_path}')
 
 # Unzip all downloaded files
 for file in os.listdir(download_path):
