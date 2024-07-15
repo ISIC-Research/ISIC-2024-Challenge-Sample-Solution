@@ -10,6 +10,10 @@ https://www.kaggle.com/competitions/isic-2024-challenge/overview
 
 The data can be downloaded from Kaggle using the CLI tool. See the example in Downloading_Data.py. 
 
+## Instructions to Acces the Monet Model
+
+Instructions to download the Monet Model can be found here: https://github.com/suinleelab/MONET.
+
 ## Creating Image Descriptions from Metadata 
 
 The Monet Model has the ability to process text along with images. Captions can be generated using metadata fields to supplement each image. 
