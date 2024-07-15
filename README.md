@@ -12,9 +12,9 @@ The data can be downloaded from Kaggle using the CLI tool. See the example in Do
 
 ## Instructions to Access the Monet Model
 
-Instructions on downloading the MOMET Model can be found here: https://github.com/suinleelab/MONET.
+Instructions on downloading the MONET Model can be found here: https://github.com/suinleelab/MONET.
 
-!!REMINDER!!: MONET License: Attribution-NonCommercial-ShareAlike 4.0 International. Therefore, [ISIC 2024 - Skin Cancer Detection with 3D-TBP Challenge](https://www.kaggle.com/competitions/isic-2024-challenge) submissions using the MONET model can not be considered for prize award, but will be considered in the leaderboards.
+**!!REMINDER!!**: MONET License: Attribution-NonCommercial-ShareAlike 4.0 International. Therefore, [ISIC 2024 - Skin Cancer Detection with 3D-TBP Challenge](https://www.kaggle.com/competitions/isic-2024-challenge) submissions using the MONET model can not be considered for prize award, but will be considered in the leaderboards.
 
 ## Creating Image Descriptions from Metadata 
 
