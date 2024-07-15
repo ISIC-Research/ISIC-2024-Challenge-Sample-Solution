@@ -14,6 +14,8 @@ The data can be downloaded from Kaggle using the CLI tool. See the example in Do
 
 Instructions to download the Monet Model can be found here: https://github.com/suinleelab/MONET.
 
+Monet License: Attribution-NonCommercial-ShareAlike 4.0 International
+
 ## Creating Image Descriptions from Metadata 
 
 The Monet Model has the ability to process text along with images. Captions can be generated using metadata fields to supplement each image. 
